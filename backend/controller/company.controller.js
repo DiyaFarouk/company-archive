@@ -36,6 +36,22 @@ const getCompanyById = async (req, res) =>{
         res.status(500).json({ message: "Error fetching company", error: error.message})
     }
 }
+const updateCompany = async (req, res) =>{
+    try{
+        const updatedCompany = await Company.findByIdAndUpdate(req.params.id, req.body, { new:true })
+        res.status(200).json(updatedCompany)
+    } catch (error){
+        res.status(500).json({ message: "Error in update", error: error.message})
+    }
+}
+const deleteCompanyById = async (req, res) =>{
+    try{
+        const deleteCompany = await Company.findByIdAndDelete(req.params.id)
+        res.status(200).json(deleteCompany)
+    } catch (error){
+        res.status(500).json({ message: "Error in deleting company", error:error.message})
+    }
+}
 
 
-module.exports = { createCompany, getAllCompanies, getCompanyById }
+module.exports = { createCompany, getAllCompanies, getCompanyById, updateCompany, deleteCompanyById }
