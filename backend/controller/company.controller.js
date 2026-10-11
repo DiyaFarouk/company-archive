@@ -1,21 +1,6 @@
 const Company = require("../models/company.model")
 
-const createCompany = async (req,res) =>{
-    try {
-        const { description, logo, website, location, industry } =req.body;
-        const company = new Company({
-            description,
-            logo,
-            website,
-            location,
-            industry
-        })
-        await company.save()
-        res.status(201).json({ message: "Company created successfully", company })
-        } catch (error){
-            res.status(500).json({ message :"Error creating company", error: error.message})
-    }
-}
+
 
 const getAllCompanies = async (req, res) =>{
     try{
@@ -29,7 +14,7 @@ const getCompanyById = async (req, res) =>{
     try{
         const company = await Company.findById(req.params.id)
         if(!company) {
-            return res.status(404).json({message: "Comapny not found"})
+            return res.status(404).json({message: "Company not found"})
         }
         res.status(200).json({ company })
     }catch (error) {
@@ -44,14 +29,16 @@ const updateCompany = async (req, res) =>{
         res.status(500).json({ message: "Error in update", error: error.message})
     }
 }
-const deleteCompanyById = async (req, res) =>{
-    try{
-        const deleteCompany = await Company.findByIdAndDelete(req.params.id)
-        res.status(200).json(deleteCompany)
-    } catch (error){
-        res.status(500).json({ message: "Error in deleting company", error:error.message})
-    }
-}
+const deleteCompanyById = async (req, res) => {
+  const company = await Company.findById(req.params.id);
+  if (!company) return res.status(404).json({ message: "Company not found" });
+
+  await Employee.deleteMany({ company: company._id });
+  await User.findByIdAndDelete(company.user);
+  await company.deleteOne();
+
+  res.status(200).json({ message: "Company and all its data deleted" });
+};
 
 
-module.exports = { createCompany, getAllCompanies, getCompanyById, updateCompany, deleteCompanyById }
+module.exports = { getAllCompanies, getCompanyById, updateCompany, deleteCompanyById }
