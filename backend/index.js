@@ -8,7 +8,7 @@ app.use(cors({
   origin: "http://localhost:5173",
   credentials: true,
 }));
-app.use(express.json());
+
 app.use(express.urlencoded({ extended: true }));
 
 
@@ -17,6 +17,12 @@ const dotenv = require("dotenv").config();
 const port = process.env.PORT;
 
 
+app.use(express.json({ limit: "10kb" }));
+
+app.use("/auth", require("./routes/auth.route.js"));
+app.use("/employees", require("./routes/employee.route.js"));
+app.use("/company", require("./routes/company.route.js"));
+app.use("/admin", require("./routes/admin.route.js"));
 
 
 connectDB();
