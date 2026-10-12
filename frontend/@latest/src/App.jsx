@@ -210,7 +210,7 @@ function App() {
 
 function AuthScreen({ onLogin }) {
 	const [mode, setMode] = useState('login')
-	const [form, setForm] = useState({ name: '', companyName: '', email: '', password: '' })
+	const [form, setForm] = useState({ name: '', companyName: '', industry: '', location: '', website: '', email: '', password: '' })
 	const [error, setError] = useState('')
 	const [notice, setNotice] = useState('')
 	const [busy, setBusy] = useState(false)
@@ -244,7 +244,14 @@ function AuthScreen({ onLogin }) {
 				<div className="auth-form-wrap"><div className="auth-form-heading"><span className="form-kicker">{mode === 'login' ? 'WELCOME BACK' : 'START YOUR WORKSPACE'}</span><h2>{mode === 'login' ? 'Sign in to Diyya' : 'Create your account'}</h2><p>{mode === 'login' ? 'Pick up right where your records are.' : 'Your company archive starts here.'}</p></div>
 					{error && <div className="form-alert">{error}</div>}{notice && <div className="form-success"><Check size={16} />{notice}</div>}
 					<form className="auth-form" onSubmit={submit}>
-						{mode === 'signup' && <><label>Your name<input required autoComplete="name" placeholder="Jordan Lee" value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} /></label><label>Company name<input required autoComplete="organization" placeholder="Northstar Studio" value={form.companyName} onChange={(event) => setForm({ ...form, companyName: event.target.value })} /></label></>}
+						{mode === 'signup' && <>
+							<label>Your name<input required autoComplete="name" placeholder="Jordan Lee" value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} /></label>
+							<label>Company name<input required autoComplete="organization" placeholder="Northstar Studio" value={form.companyName} onChange={(event) => setForm({ ...form, companyName: event.target.value })} /></label>
+							<label>Industry (optional)<input autoComplete="organization-title" placeholder="Design & technology" value={form.industry} onChange={(event) => setForm({ ...form, industry: event.target.value })} /></label>
+							<label>Location (optional)<input autoComplete="address-level2" placeholder="Portland, Oregon" value={form.location} onChange={(event) => setForm({ ...form, location: event.target.value })} /></label>
+							<label>Company website (optional)<input type="url" autoComplete="url" placeholder="https://company.com" value={form.website} onChange={(event) => setForm({ ...form, website: event.target.value })} /></label>
+							<p className="signup-details-note">You can add or update these details later in your company profile.</p>
+						</>}
 						<label>Work email<span className="input-wrap"><Mail size={16} /><input required type="email" autoComplete="email" placeholder="you@company.com" value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} /></span></label>
 						<label>Password<span className="input-wrap"><LockKeyhole size={16} /><input required type="password" minLength={mode === 'signup' ? 8 : undefined} autoComplete={mode === 'login' ? 'current-password' : 'new-password'} placeholder={mode === 'signup' ? 'At least 8 characters' : 'Enter your password'} value={form.password} onChange={(event) => setForm({ ...form, password: event.target.value })} /></span></label>
 						{mode === 'login' && <div className="form-helper"><span><span className="tiny-lock"><LockKeyhole size={11} /></span> Your data stays yours</span><span>Protected access</span></div>}

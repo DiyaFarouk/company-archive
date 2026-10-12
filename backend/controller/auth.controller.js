@@ -6,7 +6,7 @@ const jwt = require("jsonwebtoken");
 const signUp = async (req, res) => {
   let user;
   try {
-    const { name, email, password, companyName } = req.body;
+    const { name, email, password, companyName, industry, location, website } = req.body;
 
     if (!name || !email || !password || !companyName) {
       return res.status(400).json({ message: "Name, email, password and company name are required" });
@@ -30,6 +30,9 @@ const signUp = async (req, res) => {
     await Company.create({
       user: user._id,
       name: companyName,
+      industry,
+      location,
+      website,
       // status defaults to "pending" until the admin approves
     });
 
