@@ -23,6 +23,7 @@ app.use("/auth", require("./routes/auth.route.js"));
 app.use("/employees", require("./routes/employee.route.js"));
 app.use("/company", require("./routes/company.route.js"));
 app.use("/admin", require("./routes/admin.route.js"));
+app.use("/departments", require("./routes/department.route.js"));
 
 
 connectDB();

@@ -3,7 +3,7 @@ import {
 	ArrowDownToLine, ArrowRight, ArrowUpRight, BadgeCheck, Bell,
 	BriefcaseBusiness, Building2, Check, ChevronDown, CircleHelp, Clock3,
 	DoorOpen, FileText, Filter, LayoutDashboard, LoaderCircle, LockKeyhole,
-	Mail, Menu, Pencil, Plus, Search, Settings2, ShieldCheck,
+	Layers3, Mail, Menu, Pencil, Plus, Search, Settings2, ShieldCheck,
 	Sparkles, Trash2, Users, X,
 } from 'lucide-react'
 
@@ -36,6 +36,7 @@ function App() {
 	const [section, setSection] = useState('overview')
 	const [companies, setCompanies] = useState([])
 	const [employees, setEmployees] = useState([])
+	const [departments, setDepartments] = useState([])
 	const [company, setCompany] = useState(null)
 	const [loading, setLoading] = useState(false)
 	const [dataError, setDataError] = useState('')
@@ -62,12 +63,14 @@ function App() {
 				const payload = await request('/admin/companies', { token: session.token })
 				setCompanies(payload.companies || [])
 			} else {
-				const [companyPayload, employeePayload] = await Promise.all([
+				const [companyPayload, employeePayload, departmentPayload] = await Promise.all([
 					request('/company/me', { token: session.token }),
 					request('/employees', { token: session.token }),
+					request('/departments', { token: session.token }),
 				])
 				setCompany(companyPayload.company)
 				setEmployees(employeePayload.employees || [])
+				setDepartments(departmentPayload.departments || [])
 			}
 		} catch (error) {
 			setDataError(error.message)
@@ -85,13 +88,15 @@ function App() {
 		return matchesStatus && value.includes(query.toLowerCase())
 	}), [companies, query, statusFilter])
 
-	const filteredEmployees = useMemo(() => employees.filter((item) => `${item.name} ${item.email} ${item.job_title}`.toLowerCase().includes(query.toLowerCase())), [employees, query])
+	const filteredEmployees = useMemo(() => employees.filter((item) => `${item.name} ${item.email} ${item.job_title} ${item.department?.name || ''}`.toLowerCase().includes(query.toLowerCase())), [employees, query])
+	const filteredDepartments = useMemo(() => departments.filter((item) => `${item.name} ${item.description || ''}`.toLowerCase().includes(query.toLowerCase())), [departments, query])
 
 	function logout() {
 		localStorage.removeItem(STORAGE_KEY)
 		setSession(null)
 		setCompanies([])
 		setEmployees([])
+		setDepartments([])
 		setCompany(null)
 		setSection('overview')
 	}
@@ -120,11 +125,35 @@ function App() {
 			const payload = await request(editing ? `/employees/${_id}` : '/employees', {
 				token: session.token,
 				method: editing ? 'PATCH' : 'POST',
-				body: JSON.stringify({ ...body, salary: Number(body.salary) }),
+				body: JSON.stringify({ ...body, salary: Number(body.salary), department: body.department || null }),
 			})
 			setEmployees((current) => editing ? current.map((item) => item._id === _id ? payload.employee : item) : [payload.employee, ...current])
 			setModal(null)
 			notify(editing ? 'Employee record updated.' : 'Employee added to the archive.')
+		} catch (error) { notify(error.message) }
+	}
+
+	async function saveDepartment(form) {
+		const editing = Boolean(form._id)
+		const { _id, ...body } = form
+		try {
+			const payload = await request(editing ? `/departments/${_id}` : '/departments', {
+				token: session.token,
+				method: editing ? 'PATCH' : 'POST',
+				body: JSON.stringify(body),
+			})
+			setDepartments((current) => (editing ? current.map((item) => item._id === _id ? payload.department : item) : [...current, payload.department]).sort((a, b) => a.name.localeCompare(b.name)))
+			setModal(null)
+			notify(editing ? 'Department updated.' : 'Department created.')
+		} catch (error) { notify(error.message) }
+	}
+
+	async function deleteDepartment(item) {
+		if (!window.confirm(`Delete ${item.name}? Departments with assigned employees cannot be deleted.`)) return
+		try {
+			await request(`/departments/${item._id}`, { token: session.token, method: 'DELETE' })
+			setDepartments((current) => current.filter((entry) => entry._id !== item._id))
+			notify(`${item.name} was deleted.`)
 		} catch (error) { notify(error.message) }
 	}
 
@@ -147,12 +176,13 @@ function App() {
 	}
 
 	function exportCsv() {
-		const rows = isAdmin ? filteredCompanies : filteredEmployees
-		const fields = isAdmin ? ['name', 'industry', 'location', 'status', 'createdAt'] : ['name', 'email', 'job_title', 'salary']
-		const csv = [fields.join(','), ...rows.map((row) => fields.map((key) => `"${String(row[key] ?? '').replaceAll('"', '""')}"`).join(','))].join('\n')
+		const isDepartmentExport = section === 'departments'
+		const rows = isAdmin ? filteredCompanies : isDepartmentExport ? filteredDepartments : filteredEmployees
+		const fields = isAdmin ? ['name', 'industry', 'location', 'status', 'createdAt'] : isDepartmentExport ? ['name', 'description', 'createdAt'] : ['name', 'email', 'job_title', 'department', 'salary']
+		const csv = [fields.join(','), ...rows.map((row) => fields.map((key) => `"${String(key === 'department' ? row.department?.name || '' : row[key] ?? '').replaceAll('"', '""')}"`).join(','))].join('\n')
 		const link = document.createElement('a')
 		link.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }))
-		link.download = isAdmin ? 'company-archive.csv' : 'employee-archive.csv'
+		link.download = isAdmin ? 'company-archive.csv' : isDepartmentExport ? 'department-archive.csv' : 'employee-archive.csv'
 		link.click()
 		URL.revokeObjectURL(link.href)
 	}
@@ -161,7 +191,7 @@ function App() {
 
 	const navigation = isAdmin
 		? [{ id: 'overview', label: 'Overview', icon: LayoutDashboard }, { id: 'companies', label: 'Company archive', icon: Building2 }]
-		: [{ id: 'overview', label: 'Overview', icon: LayoutDashboard }, { id: 'employees', label: 'Employees', icon: Users }, { id: 'profile', label: 'Company profile', icon: Building2 }]
+		: [{ id: 'overview', label: 'Overview', icon: LayoutDashboard }, { id: 'employees', label: 'Employees', icon: Users }, { id: 'departments', label: 'Departments', icon: Layers3 }, { id: 'profile', label: 'Company profile', icon: Building2 }]
 
 	return (
 		<div className="app-shell">
@@ -196,12 +226,14 @@ function App() {
 					{section === 'overview' && <Overview isAdmin={isAdmin} userName={userName} company={company} companies={companies} employees={employees} loading={loading} onNavigate={setSection} onAdd={() => setModal({ type: 'employee' })} />}
 					{section === 'companies' && isAdmin && <CompanyArchive companies={filteredCompanies} allCompanies={companies} query={query} setQuery={setQuery} statusFilter={statusFilter} setStatusFilter={setStatusFilter} loading={loading} onExport={exportCsv} onStatus={updateCompanyStatus} onDelete={deleteCompany} />}
 					{section === 'employees' && !isAdmin && <EmployeeArchive employees={filteredEmployees} query={query} setQuery={setQuery} loading={loading} onExport={exportCsv} onAdd={() => setModal({ type: 'employee' })} onEdit={(item) => setModal({ type: 'employee', item })} onDelete={deleteEmployee} />}
+					{section === 'departments' && !isAdmin && <DepartmentArchive departments={filteredDepartments} allDepartments={departments} employees={employees} query={query} setQuery={setQuery} loading={loading} onExport={exportCsv} onAdd={() => setModal({ type: 'department' })} onEdit={(item) => setModal({ type: 'department', item })} onDelete={deleteDepartment} />}
 					{section === 'profile' && !isAdmin && <CompanyProfile company={company} employees={employees} onEdit={() => setModal({ type: 'profile', item: company })} />}
 					{loading && <div className="loading-indicator"><LoaderCircle size={16} className="spin" /> Syncing workspace data</div>}
 				</div>
 			</main>
 
-			{modal?.type === 'employee' && <EmployeeModal item={modal.item} onClose={() => setModal(null)} onSave={saveEmployee} />}
+			{modal?.type === 'employee' && <EmployeeModal item={modal.item} departments={departments} onClose={() => setModal(null)} onSave={saveEmployee} />}
+			{modal?.type === 'department' && <DepartmentModal item={modal.item} onClose={() => setModal(null)} onSave={saveDepartment} />}
 			{modal?.type === 'profile' && <ProfileModal item={modal.item} onClose={() => setModal(null)} onSave={saveProfile} />}
 			{toast && <div className="toast"><span className="toast-check"><Check size={14} /></span>{toast}</div>}
 		</div>
@@ -303,8 +335,19 @@ function EmployeeArchive({ employees, query, setQuery, loading, onExport, onAdd,
 	return <section className="page-section page-enter"><div className="page-heading"><div><div className="date-line"><span className="date-marker" /> PEOPLE / DIRECTORY</div><h1>Employee records<span className="heading-period">.</span></h1><p>A current, considered record of the people at your company.</p></div><div className="heading-actions"><button className="secondary-button" onClick={onExport}><ArrowDownToLine size={16} /> Export CSV</button><button className="primary-button" onClick={onAdd}><Plus size={17} /> Add employee</button></div></div>
 		<div className="archive-summary"><div><span className="summary-big">{employees.length}</span><span className="summary-label">people on record</span></div><span className="summary-separator" /><div className="summary-mini"><Users size={15} /> {employees.length} employee records</div><div className="summary-mini"><BriefcaseBusiness size={15} /> {money(totalPayroll)} monthly salary total</div></div>
 		<div className="archive-toolbar employee-toolbar"><span className="toolbar-title">ALL EMPLOYEES <span>{employees.length}</span></span><label className="search-box"><Search size={16} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search people..." /><kbd>⌘ K</kbd></label></div>
-		<div className="table-frame"><div className="table-scroll"><table className="employee-table"><thead><tr><th>EMPLOYEE</th><th>JOB TITLE</th><th>EMAIL ADDRESS</th><th>MONTHLY SALARY</th><th>ADDED</th><th><span className="sr-only">Actions</span></th></tr></thead><tbody>{employees.map((item, index) => <tr key={item._id} style={{ animationDelay: `${index * 35}ms` }}><td><div className="table-company"><span className={`avatar employee-color-${index % 4}`}>{initials(item.name)}</span><b>{item.name}</b></div></td><td>{item.job_title}</td><td>{item.email}</td><td className="salary-cell">{money(item.salary)}</td><td>{shortDate(item.createdAt)}</td><td><div className="table-actions"><button title="Edit employee" aria-label={`Edit ${item.name}`} className="action-button" onClick={() => onEdit(item)}><Pencil size={14} /></button><button title="Delete employee" aria-label={`Delete ${item.name}`} className="action-button danger-action" onClick={() => onDelete(item)}><Trash2 size={14} /></button></div></td></tr>)}</tbody></table></div>{employees.length === 0 && <EmptyState icon={Users} title={loading ? 'Loading employee records' : query ? 'No matching employees' : 'Your directory is ready'} description={query ? 'Try another name, email or job title.' : 'Add your first employee record to get started.'} action={!query && !loading ? <button className="secondary-button" onClick={onAdd}><Plus size={15} /> Add first employee</button> : null} />}</div>
+		<div className="table-frame"><div className="table-scroll"><table className="employee-table"><thead><tr><th>EMPLOYEE</th><th>JOB TITLE</th><th>DEPARTMENT</th><th>EMAIL ADDRESS</th><th>MONTHLY SALARY</th><th>ADDED</th><th><span className="sr-only">Actions</span></th></tr></thead><tbody>{employees.map((item, index) => <tr key={item._id} style={{ animationDelay: `${index * 35}ms` }}><td><div className="table-company"><span className={`avatar employee-color-${index % 4}`}>{initials(item.name)}</span><b>{item.name}</b></div></td><td>{item.job_title}</td><td>{item.department?.name || '—'}</td><td>{item.email}</td><td className="salary-cell">{money(item.salary)}</td><td>{shortDate(item.createdAt)}</td><td><div className="table-actions"><button title="Edit employee" aria-label={`Edit ${item.name}`} className="action-button" onClick={() => onEdit(item)}><Pencil size={14} /></button><button title="Delete employee" aria-label={`Delete ${item.name}`} className="action-button danger-action" onClick={() => onDelete(item)}><Trash2 size={14} /></button></div></td></tr>)}</tbody></table></div>{employees.length === 0 && <EmptyState icon={Users} title={loading ? 'Loading employee records' : query ? 'No matching employees' : 'Your directory is ready'} description={query ? 'Try another name, email or job title.' : 'Add your first employee record to get started.'} action={!query && !loading ? <button className="secondary-button" onClick={onAdd}><Plus size={15} /> Add first employee</button> : null} />}</div>
 		<div className="table-foot"><span>Showing <b>{employees.length}</b> employee records</span><span>Private to {employees.length ? 'your company' : 'this workspace'} <ShieldCheck size={14} /></span></div>
+	</section>
+}
+
+function DepartmentArchive({ departments, allDepartments, employees, query, setQuery, loading, onExport, onAdd, onEdit, onDelete }) {
+	const assignedEmployees = (department) => employees.filter((employee) => (employee.department?._id || employee.department) === department._id).length
+	const assignedCount = employees.filter((employee) => employee.department).length
+	return <section className="page-section page-enter"><div className="page-heading"><div><div className="date-line"><span className="date-marker" /> PEOPLE / ORGANIZATION</div><h1>Departments<span className="heading-period">.</span></h1><p>Organize your people by the teams and functions they work in.</p></div><div className="heading-actions"><button className="secondary-button" onClick={onExport}><ArrowDownToLine size={16} /> Export CSV</button><button className="primary-button" onClick={onAdd}><Plus size={17} /> Add department</button></div></div>
+		<div className="archive-summary department-summary"><div><span className="summary-big">{allDepartments.length}</span><span className="summary-label">departments</span></div><span className="summary-separator" /><div className="summary-mini"><Users size={15} /> {assignedCount} people assigned</div><div className="summary-mini"><Layers3 size={15} /> {allDepartments.length - allDepartments.filter((item) => assignedEmployees(item) > 0).length} unstaffed</div></div>
+		<div className="archive-toolbar employee-toolbar"><span className="toolbar-title">YOUR DEPARTMENTS <span>{allDepartments.length}</span></span><label className="search-box"><Search size={16} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search departments..." /><kbd>⌘ K</kbd></label></div>
+		<div className="table-frame"><div className="table-scroll"><table className="department-table"><thead><tr><th>DEPARTMENT</th><th>DESCRIPTION</th><th>PEOPLE</th><th>CREATED</th><th><span className="sr-only">Actions</span></th></tr></thead><tbody>{departments.map((item, index) => <tr key={item._id} style={{ animationDelay: `${index * 35}ms` }}><td><div className="table-company"><span className="department-mark"><Layers3 size={16} /></span><b>{item.name}</b></div></td><td className="department-description">{item.description || 'No description added'}</td><td><span className="department-member-count"><Users size={14} /> {assignedEmployees(item)}</span></td><td>{shortDate(item.createdAt)}</td><td><div className="table-actions"><button title="Edit department" aria-label={`Edit ${item.name}`} className="action-button" onClick={() => onEdit(item)}><Pencil size={14} /></button><button title="Delete department" aria-label={`Delete ${item.name}`} className="action-button danger-action" onClick={() => onDelete(item)}><Trash2 size={14} /></button></div></td></tr>)}</tbody></table></div>{departments.length === 0 && <EmptyState icon={Layers3} title={loading ? 'Loading departments' : query ? 'No matching departments' : 'No departments yet'} description={query ? 'Try a different department name or description.' : 'Create departments to organize employee records.'} action={!query && !loading ? <button className="secondary-button" onClick={onAdd}><Plus size={15} /> Add first department</button> : null} />}</div>
+		<div className="table-foot"><span>Showing <b>{departments.length}</b> of <b>{allDepartments.length}</b> departments</span><span>People assigned to a department <ShieldCheck size={14} /></span></div>
 	</section>
 }
 
@@ -324,10 +367,16 @@ function StatusBadge({ status = 'pending' }) {
 
 function EmptyState({ icon: Icon, title, description, action }) { return <div className="empty-state"><span className="empty-icon"><Icon size={20} /></span><h3>{title}</h3><p>{description}</p>{action}</div> }
 
-function EmployeeModal({ item, onClose, onSave }) {
-	const [form, setForm] = useState({ name: item?.name || '', email: item?.email || '', job_title: item?.job_title || '', salary: item?.salary || '' })
+function EmployeeModal({ item, departments, onClose, onSave }) {
+	const [form, setForm] = useState({ name: item?.name || '', email: item?.email || '', job_title: item?.job_title || '', salary: item?.salary || '', department: item?.department?._id || item?.department || '' })
 	function submit(event) { event.preventDefault(); onSave({ ...form, ...(item?._id ? { _id: item._id } : {}) }) }
-	return <ModalFrame onClose={onClose} title={item ? 'Edit employee record' : 'Add employee'} description={item ? 'Keep this company record up to date.' : 'Add a person to your company archive.'}><form className="modal-form" onSubmit={submit}><label>Full name<input autoFocus required placeholder="Alex Morgan" value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} /></label><label>Work email<input required type="email" placeholder="alex@company.com" value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} /></label><label>Job title<input required placeholder="Operations lead" value={form.job_title} onChange={(event) => setForm({ ...form, job_title: event.target.value })} /></label><label>Monthly salary <span className="field-hint">USD</span><div className="salary-input"><span>$</span><input required type="number" min="0" step="100" placeholder="6,500" value={form.salary} onChange={(event) => setForm({ ...form, salary: event.target.value })} /></div></label><div className="modal-actions"><button type="button" className="secondary-button" onClick={onClose}>Cancel</button><button className="primary-button"><Check size={16} /> {item ? 'Save changes' : 'Add employee'}</button></div></form></ModalFrame>
+	return <ModalFrame onClose={onClose} title={item ? 'Edit employee record' : 'Add employee'} description={item ? 'Keep this company record up to date.' : 'Add a person to your company archive.'}><form className="modal-form" onSubmit={submit}><label>Full name<input autoFocus required placeholder="Alex Morgan" value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} /></label><label>Work email<input required type="email" placeholder="alex@company.com" value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} /></label><label>Job title<input required placeholder="Operations lead" value={form.job_title} onChange={(event) => setForm({ ...form, job_title: event.target.value })} /></label><label>Department<select value={form.department} onChange={(event) => setForm({ ...form, department: event.target.value })}><option value="">No department</option>{departments.map((department) => <option key={department._id} value={department._id}>{department.name}</option>)}</select></label><label>Monthly salary <span className="field-hint">USD</span><div className="salary-input"><span>$</span><input required type="number" min="0" step="100" placeholder="6,500" value={form.salary} onChange={(event) => setForm({ ...form, salary: event.target.value })} /></div></label><div className="modal-actions"><button type="button" className="secondary-button" onClick={onClose}>Cancel</button><button className="primary-button"><Check size={16} /> {item ? 'Save changes' : 'Add employee'}</button></div></form></ModalFrame>
+}
+
+function DepartmentModal({ item, onClose, onSave }) {
+	const [form, setForm] = useState({ name: item?.name || '', description: item?.description || '' })
+	function submit(event) { event.preventDefault(); onSave({ ...form, ...(item?._id ? { _id: item._id } : {}) }) }
+	return <ModalFrame onClose={onClose} title={item ? 'Edit department' : 'Add department'} description={item ? 'Update this department’s details.' : 'Create a department for your company.'}><form className="modal-form" onSubmit={submit}><label>Department name<input autoFocus required maxLength="80" placeholder="Operations" value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} /></label><label>Description <span className="optional-label">OPTIONAL</span><textarea rows="3" maxLength="240" placeholder="What this team is responsible for..." value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} /></label><div className="modal-actions"><button type="button" className="secondary-button" onClick={onClose}>Cancel</button><button className="primary-button"><Check size={16} /> {item ? 'Save changes' : 'Create department'}</button></div></form></ModalFrame>
 }
 
 function ProfileModal({ item, onClose, onSave }) {
