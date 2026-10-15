@@ -128,3 +128,18 @@ a { color: inherit; text-decoration: none; }
 	.department-table { min-width: 700px; }
 }
 
+.cv-file-input { min-height: 42px !important; padding: 4px !important; border-style: dashed !important; background: #fbfcfa !important; }
+.cv-file-input::file-selector-button { min-height: 30px; margin-right: 9px; padding: 0 10px; border: 1px solid #dfe7df; border-radius: 3px; background: #fff; color: #456454; font: 600 10px 'DM Sans', sans-serif; cursor: pointer; }
+.cv-file-input::file-selector-button:hover { border-color: #91b9a2; background: #f5f9f4; }
+.cv-upload-status { min-height: 15px; margin-top: -8px; color: #87948c; font-size: 9px; }
+.cv-upload-status a { color: #367751; text-decoration: underline; text-underline-offset: 2px; }
+.cv-upload-error { color: #a14e40; }
+.cv-link { display: inline-flex; align-items: center; gap: 5px; color: #367751; font-size: 10px; font-weight: 600; white-space: nowrap; }
+.cv-link:hover { color: #164f38; text-decoration: underline; text-underline-offset: 2px; }
+.cv-empty { color: #9aa59f; }
+.employee-table { min-width: 1060px; }
+
+@media (max-width: 560px) {
+	.employee-table { min-width: 1060px; }
+}
+

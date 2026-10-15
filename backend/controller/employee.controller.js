@@ -1,6 +1,15 @@
 const Employee = require("../models/employee.model.js")
 const Department = require("../models/department.model.js")
-const cloudinary = reuire("../config/cloudinary.js")
+const cloudinary = require("../config/cloudinary.js")
+
+const uploadCv = async (cv) => {
+  if (!cv) return null;
+  const result = await cloudinary.uploader.upload(cv, {
+    folder: "company-archive/cvs",
+    resource_type: "auto",
+  });
+  return result.secure_url;
+};
 
 const resolveDepartment = async (departmentId, companyId) => {
   if (!departmentId) return null;
@@ -11,19 +20,13 @@ const resolveDepartment = async (departmentId, companyId) => {
 
 const createEmployee = async (req, res) => {
   try {
-    const { name, email, job_title, salary , cv} = req.body;
-    let cloudinaryResponse = null;
-    if (cv) {
-      cloudinaryResponse = await cloudinary.uploader.upload(cv, {
-        folder: "company-archive/cvs",
-        public_id: Date.now().toString()
-      })
-    }
+    const { name, email, job_title, salary, cv } = req.body;
     const department = await resolveDepartment(req.body.department, req.company._id);
     if (department === undefined) return res.status(400).json({ message: "Department not found" });
+    const cvUrl = await uploadCv(cv);
     const employee = await Employee.create({
       company: req.company._id, // from middleware, never from body
-      name, email, job_title, salary, department, cv: cloudinaryResponse ? cloudinaryResponse.secure_url : null
+      name, email, job_title, salary, department, cv: cvUrl
     });
     await employee.populate("department", "name");
     res.status(201).json({ message: "Employee created successfully", employee });
@@ -48,6 +51,7 @@ const getEmployeeById = async (req, res) => {
 const updateEmployee = async (req, res) => {
   const { name, email, job_title, salary } = req.body; // whitelist
   const updates = { name, email, job_title, salary };
+  if (req.body.cv) updates.cv = await uploadCv(req.body.cv);
   if (req.body.department !== undefined) {
     const department = await resolveDepartment(req.body.department, req.company._id);
     if (department === undefined) return res.status(400).json({ message: "Department not found" });

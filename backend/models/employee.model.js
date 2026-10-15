@@ -8,11 +8,11 @@ const employeeSchema = new mongoose.Schema({
   job_title: { type: String, required: true },
   salary: { type: Number, required: true },
   department: {
-  type: mongoose.Schema.Types.ObjectId,
-  ref: "Department",
-  default: null,
-  cv: { type: String, default: null}
-},
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "Department",
+    default: null,
+  },
+  cv: { type: String, default: null },
 }, { timestamps: true });
 
 employeeSchema.index({ company: 1, email: 1 }, { unique: true });

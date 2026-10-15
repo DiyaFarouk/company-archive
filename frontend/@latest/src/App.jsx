@@ -335,7 +335,7 @@ function EmployeeArchive({ employees, query, setQuery, loading, onExport, onAdd,
 	return <section className="page-section page-enter"><div className="page-heading"><div><div className="date-line"><span className="date-marker" /> PEOPLE / DIRECTORY</div><h1>Employee records<span className="heading-period">.</span></h1><p>A current, considered record of the people at your company.</p></div><div className="heading-actions"><button className="secondary-button" onClick={onExport}><ArrowDownToLine size={16} /> Export CSV</button><button className="primary-button" onClick={onAdd}><Plus size={17} /> Add employee</button></div></div>
 		<div className="archive-summary"><div><span className="summary-big">{employees.length}</span><span className="summary-label">people on record</span></div><span className="summary-separator" /><div className="summary-mini"><Users size={15} /> {employees.length} employee records</div><div className="summary-mini"><BriefcaseBusiness size={15} /> {money(totalPayroll)} monthly salary total</div></div>
 		<div className="archive-toolbar employee-toolbar"><span className="toolbar-title">ALL EMPLOYEES <span>{employees.length}</span></span><label className="search-box"><Search size={16} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search people..." /><kbd>⌘ K</kbd></label></div>
-		<div className="table-frame"><div className="table-scroll"><table className="employee-table"><thead><tr><th>EMPLOYEE</th><th>JOB TITLE</th><th>DEPARTMENT</th><th>EMAIL ADDRESS</th><th>MONTHLY SALARY</th><th>ADDED</th><th><span className="sr-only">Actions</span></th></tr></thead><tbody>{employees.map((item, index) => <tr key={item._id} style={{ animationDelay: `${index * 35}ms` }}><td><div className="table-company"><span className={`avatar employee-color-${index % 4}`}>{initials(item.name)}</span><b>{item.name}</b></div></td><td>{item.job_title}</td><td>{item.department?.name || '—'}</td><td>{item.email}</td><td className="salary-cell">{money(item.salary)}</td><td>{shortDate(item.createdAt)}</td><td><div className="table-actions"><button title="Edit employee" aria-label={`Edit ${item.name}`} className="action-button" onClick={() => onEdit(item)}><Pencil size={14} /></button><button title="Delete employee" aria-label={`Delete ${item.name}`} className="action-button danger-action" onClick={() => onDelete(item)}><Trash2 size={14} /></button></div></td></tr>)}</tbody></table></div>{employees.length === 0 && <EmptyState icon={Users} title={loading ? 'Loading employee records' : query ? 'No matching employees' : 'Your directory is ready'} description={query ? 'Try another name, email or job title.' : 'Add your first employee record to get started.'} action={!query && !loading ? <button className="secondary-button" onClick={onAdd}><Plus size={15} /> Add first employee</button> : null} />}</div>
+		<div className="table-frame"><div className="table-scroll"><table className="employee-table"><thead><tr><th>EMPLOYEE</th><th>JOB TITLE</th><th>DEPARTMENT</th><th>EMAIL ADDRESS</th><th>CV</th><th>MONTHLY SALARY</th><th>ADDED</th><th><span className="sr-only">Actions</span></th></tr></thead><tbody>{employees.map((item, index) => <tr key={item._id} style={{ animationDelay: `${index * 35}ms` }}><td><div className="table-company"><span className={`avatar employee-color-${index % 4}`}>{initials(item.name)}</span><b>{item.name}</b></div></td><td>{item.job_title}</td><td>{item.department?.name || '—'}</td><td>{item.email}</td><td>{item.cv ? <a className="cv-link" href={item.cv} target="_blank" rel="noreferrer" aria-label={`Open ${item.name}'s CV`}><FileText size={14} /> View CV</a> : <span className="cv-empty">—</span>}</td><td className="salary-cell">{money(item.salary)}</td><td>{shortDate(item.createdAt)}</td><td><div className="table-actions"><button title="Edit employee" aria-label={`Edit ${item.name}`} className="action-button" onClick={() => onEdit(item)}><Pencil size={14} /></button><button title="Delete employee" aria-label={`Delete ${item.name}`} className="action-button danger-action" onClick={() => onDelete(item)}><Trash2 size={14} /></button></div></td></tr>)}</tbody></table></div>{employees.length === 0 && <EmptyState icon={Users} title={loading ? 'Loading employee records' : query ? 'No matching employees' : 'Your directory is ready'} description={query ? 'Try another name, email or job title.' : 'Add your first employee record to get started.'} action={!query && !loading ? <button className="secondary-button" onClick={onAdd}><Plus size={15} /> Add first employee</button> : null} />}</div>
 		<div className="table-foot"><span>Showing <b>{employees.length}</b> employee records</span><span>Private to {employees.length ? 'your company' : 'this workspace'} <ShieldCheck size={14} /></span></div>
 	</section>
 }
@@ -368,9 +368,52 @@ function StatusBadge({ status = 'pending' }) {
 function EmptyState({ icon: Icon, title, description, action }) { return <div className="empty-state"><span className="empty-icon"><Icon size={20} /></span><h3>{title}</h3><p>{description}</p>{action}</div> }
 
 function EmployeeModal({ item, departments, onClose, onSave }) {
-	const [form, setForm] = useState({ name: item?.name || '', email: item?.email || '', job_title: item?.job_title || '', salary: item?.salary || '', department: item?.department?._id || item?.department || '' })
+	const [form, setForm] = useState({ name: item?.name || '', email: item?.email || '', job_title: item?.job_title || '', salary: item?.salary || '', department: item?.department?._id || item?.department || '', cv: '' })
+	const [cvName, setCvName] = useState('')
+	const [cvError, setCvError] = useState('')
+	const [readingCv, setReadingCv] = useState(false)
+
+	function chooseCv(event) {
+		const file = event.target.files?.[0]
+		if (!file) return
+		const isPdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')
+		if (!isPdf) {
+			setCvError('Choose a PDF file.')
+			event.target.value = ''
+			return
+		}
+		if (file.size > 5 * 1024 * 1024) {
+			setCvError('The PDF must be 5 MB or smaller.')
+			event.target.value = ''
+			return
+		}
+		setCvError('')
+		setCvName(file.name)
+		setReadingCv(true)
+		const reader = new FileReader()
+		reader.onload = () => {
+			setForm((current) => ({ ...current, cv: reader.result }))
+			setReadingCv(false)
+		}
+		reader.onerror = () => {
+			setCvError('The PDF could not be read. Please try again.')
+			setCvName('')
+			setReadingCv(false)
+		}
+		reader.readAsDataURL(file)
+	}
+
 	function submit(event) { event.preventDefault(); onSave({ ...form, ...(item?._id ? { _id: item._id } : {}) }) }
-	return <ModalFrame onClose={onClose} title={item ? 'Edit employee record' : 'Add employee'} description={item ? 'Keep this company record up to date.' : 'Add a person to your company archive.'}><form className="modal-form" onSubmit={submit}><label>Full name<input autoFocus required placeholder="Alex Morgan" value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} /></label><label>Work email<input required type="email" placeholder="alex@company.com" value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} /></label><label>Job title<input required placeholder="Operations lead" value={form.job_title} onChange={(event) => setForm({ ...form, job_title: event.target.value })} /></label><label>Department<select value={form.department} onChange={(event) => setForm({ ...form, department: event.target.value })}><option value="">No department</option>{departments.map((department) => <option key={department._id} value={department._id}>{department.name}</option>)}</select></label><label>Monthly salary <span className="field-hint">USD</span><div className="salary-input"><span>$</span><input required type="number" min="0" step="100" placeholder="6,500" value={form.salary} onChange={(event) => setForm({ ...form, salary: event.target.value })} /></div></label><div className="modal-actions"><button type="button" className="secondary-button" onClick={onClose}>Cancel</button><button className="primary-button"><Check size={16} /> {item ? 'Save changes' : 'Add employee'}</button></div></form></ModalFrame>
+	return <ModalFrame onClose={onClose} title={item ? 'Edit employee record' : 'Add employee'} description={item ? 'Keep this company record up to date.' : 'Add a person to your company archive.'}><form className="modal-form" onSubmit={submit}>
+		<label>Full name<input autoFocus required placeholder="Alex Morgan" value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} /></label>
+		<label>Work email<input required type="email" placeholder="alex@company.com" value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} /></label>
+		<label>Job title<input required placeholder="Operations lead" value={form.job_title} onChange={(event) => setForm({ ...form, job_title: event.target.value })} /></label>
+		<label>Department<select value={form.department} onChange={(event) => setForm({ ...form, department: event.target.value })}><option value="">No department</option>{departments.map((department) => <option key={department._id} value={department._id}>{department.name}</option>)}</select></label>
+		<label>CV <span className="optional-label">OPTIONAL · PDF UP TO 5 MB</span><input className="cv-file-input" type="file" accept="application/pdf,.pdf" onChange={chooseCv} aria-describedby="cv-upload-status" /></label>
+		<div className="cv-upload-status" id="cv-upload-status" aria-live="polite">{cvError ? <span className="cv-upload-error">{cvError}</span> : cvName ? <span>{readingCv ? 'Reading PDF…' : cvName}</span> : item?.cv ? <a href={item.cv} target="_blank" rel="noreferrer">Current CV · open file</a> : <span>No CV attached</span>}</div>
+		<label>Monthly salary <span className="field-hint">USD</span><div className="salary-input"><span>$</span><input required type="number" min="0" step="100" placeholder="6,500" value={form.salary} onChange={(event) => setForm({ ...form, salary: event.target.value })} /></div></label>
+		<div className="modal-actions"><button type="button" className="secondary-button" onClick={onClose}>Cancel</button><button className="primary-button" disabled={readingCv}><Check size={16} /> {item ? 'Save changes' : 'Add employee'}</button></div>
+	</form></ModalFrame>
 }
 
 function DepartmentModal({ item, onClose, onSave }) {
