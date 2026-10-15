@@ -17,7 +17,7 @@ const dotenv = require("dotenv").config();
 const port = process.env.PORT;
 
 
-app.use(express.json({ limit: "10kb" }));
+app.use(express.json({ limit: "8mb" }));
 
 app.use("/auth", require("./routes/auth.route.js"));
 app.use("/employees", require("./routes/employee.route.js"));
